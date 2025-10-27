@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Video Player</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Lecture Player</h1>
+  </header>
+
+  <main class="video-container">
+    <div class="video-box">
+      <video id="video" width="900" controls></video>
+
+      <div class="controls">
+        <label>Speed:
+          <select id="speed">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+          </select>
+        </label>
+        <button id="flagBtn">🚩 Flag</button>
+      </div>
+
+      <div class="notes">
+        <h3>Notes</h3>
+        <div id="notesList"></div>
+        <textarea id="noteText" placeholder="Write a note..."></textarea>
+        <button id="saveNote">Save Note</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const file = params.get("file");
+    if (file) {
+      document.getElementById("video").src = `/stream/${file}`;
+    }
+  </script>
+</body>
+</html>

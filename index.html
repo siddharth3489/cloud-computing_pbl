@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CodeCraft Streaming</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>CodeCraft Streaming Platform</h1>
+  </header>
+
+  <section class="upload-box">
+    <form id="uploadForm" action="/upload" method="POST" enctype="multipart/form-data">
+      <input type="text" name="title" placeholder="Video title" required>
+      <input type="file" name="file" accept="video/*" required>
+      <button type="submit">Upload</button>
+    </form>
+  </section>
+
+  <main class="grid" id="videoGrid"></main>
+
+  <script>
+    async function loadVideos() {
+      const res = await fetch("/videos");
+      const videos = await res.json();
+      const grid = document.getElementById("videoGrid");
+      grid.innerHTML = videos.map(v => `
+        <div class="card">
+          <h3>${v.title}</h3>
+          <a href="player.html?file=${v.filename}" class="btn">Play</a>
+        </div>
+      `).join("");
+    }
+    loadVideos();
+  </script>
+</body>
+</html>
