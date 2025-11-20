@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EduStream — Cloud Video Platform</title>
+
+<style>
+  :root{
+    --accent:#0b76ef;
+    --bg:#f4f7fb;
+    --card:#fff;
+    --muted:#666;
+  }
+
+  body{
+    font-family:Inter,system-ui,Segoe UI,Roboto;
+    margin:0;
+    background:var(--bg);
+    color:#222;
+  }
+
+  /* NAVBAR */
+  .navbar{
+    background:white;
+    padding:12px 22px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    box-shadow:0 2px 10px rgba(0,0,0,0.06);
+    position:sticky; top:0; z-index:10;
+  }
+  .nav-left,.nav-right{
+    display:flex; gap:20px; align-items:center;
+  }
+  .nav-item{
+    cursor:pointer; font-weight:500;
+  }
+  .nav-item:hover{ color:var(--accent); }
+  .nav-title{
+    font-size:22px;
+    color:var(--accent);
+    font-weight:700;
+  }
+
+  /* MAIN LAYOUT */
+  .wrap{ max-width:1100px; margin:20px auto; padding:18px; }
+  .grid{ display:grid; grid-template-columns:350px 1fr; gap:18px; }
+  .card{ background:white; padding:16px; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.06); }
+
+  label{ font-size:14px; color:var(--muted); margin-bottom:4px; display:block; }
+  select,input,button{ width:100%; padding:8px 10px; border-radius:8px; border:1px solid #dbe1e8; background:white; }
+
+  /* SIDEBAR */
+  .lecture-list{ max-height:420px; overflow:auto; margin-top:10px; }
+  .lecture-item{
+    padding:10px;
+    margin-bottom:10px;
+    border-radius:8px;
+    border:1px solid #eee;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .lecture-item:hover{ background:#f7fbff; cursor:pointer; }
+
+  /* VIDEO AREA */
+  video{ width:100%; border-radius:10px; background:black; }
+
+  .btn{
+    padding:8px 12px;
+    border-radius:8px;
+    border:0;
+    cursor:pointer;
+    background:var(--accent);
+    color:white;
+    font-weight:500;
+  }
+  .btn.secondary{
+    background:#eee;
+    color:#333;
+  }
+
+  /* LOCKED MESSAGE */
+  #lockedMessage {
+    display: none;
+    font-size: 18px;
+    color: #444;
+    margin-top: 20px;
+    padding: 20px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+  }
+
+  /* SCRUBBER */
+  .scrubber{
+    margin-top:8px;
+    height:10px;
+    background:#e6eefc;
+    border-radius:10px;
+    position:relative;
+    cursor:pointer;
+  }
+  .progress{
+    position:absolute;
+    left:0; top:0;
+    height:100%;
+    background:var(--accent);
+    width:0;
+    border-radius:10px;
+  }
+  .marker{
+    position:absolute;
+    top:0;
+    width:6px;
+    height:100%;
+    background:red;
+    border-radius:3px;
+    transform:translateX(-50%);
+    cursor:pointer;
+  }
+
+  /* NOTES */
+  .notes{ max-height:180px; overflow:auto; }
+
+  .note {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px dashed #cfd8e6;
+    margin-bottom: 10px;
+    background: #fafcff;
+  }
+
+  .note-text {
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    max-width: 70%;
+    color:#333;
+    word-wrap: break-word;
+  }
+
+  .note-text strong{
+    margin-bottom:4px;
+    color:#000;
+  }
+
+  .note-actions{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:6px;
+  }
+
+  .note-edit,
+  .note-delete,
+  .note-go{
+    width:70px !important;
+    padding:6px 0 !important;
+    font-size:13px;
+  }
+
+  /* PAGES */
+  #profilePage, #downloadsPage{
+    display:none;
+    padding:20px;
+  }
+
+  /* MODALS */
+  .modal-back{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+  }
+  .modal{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    min-width:300px;
+  }
+</style>
+</head>
+
+<body>
+
+<!-- NAVIGATION BAR -->
+<div class="navbar">
+  <div class="nav-left">
+    <span class="nav-title">EduStream</span>
+    <span class="nav-item" id="navHome">Home</span>
+    <span class="nav-item" id="navUser">User</span>
+    <span class="nav-item" id="navRegister">Register</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-item" id="navDownloads">Downloads</span>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- LOCKED MESSAGE (shown when NOT logged in) -->
+  <div id="lockedMessage">
+    <h2>Please Login to View Lectures</h2>
+    <p>You must be logged in to access the lecture browser.</p>
+    <button class="btn" onclick="navUser.click()">Login</button>
+  </div>
+
+  <!-- HOME PAGE -->
+  <div id="homePage">
+    <h2>Lecture Browser</h2>
+
+    <div class="grid" id="lectureGrid">
+      <!-- LEFT SIDEBAR -->
+      <aside class="card">
+
+        <label>Subject</label>
+        <select id="subjectSelect"></select>
+
+        <label style="margin-top:10px;">Topic</label>
+        <select id="topicSelect"></select>
+
+        <label style="margin-top:10px;">Subtopic</label>
+        <select id="subtopicSelect"></select>
+
+        <label style="margin-top:16px;">Lectures</label>
+        <div class="lecture-list" id="lectureList"></div>
+
+      </aside>
+
+      <!-- RIGHT VIDEO AREA -->
+      <main class="card video-area">
+
+        <video id="video" controls playsinline></video>
+
+        <div style="display:flex;align-items:center;gap:10px; flex-wrap:wrap;">
+          <button id="playPauseBtn" class="btn">Play ▶</button>
+
+          <label>Speed</label>
+          <select id="speed" style="width:100px;">
+            <option>0.5</option><option>0.75</option><option selected>1</option>
+            <option>1.25</option><option>1.5</option><option>2</option>
+          </select>
+
+          <button id="addNoteBtn" class="btn secondary">Add Note</button>
+
+          <div style="margin-left:auto; text-align:right; font-size:13px;">
+            <div id="timeDisplay">00:00 / 00:00</div>
+            <div id="currentLectureTitle">No lecture loaded</div>
+          </div>
+        </div>
+
+        <div class="scrubber" id="scrubber">
+          <div class="progress" id="progress"></div>
+          <div id="markers"></div>
+        </div>
+
+        <h3>Notes</h3>
+        <div class="notes" id="notesContainer">
+          <div style="color:#777;">No notes yet.</div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- PROFILE PAGE -->
+  <div id="profilePage">
+    <h2>Your Profile</h2>
+    <div class="card">
+      <p><strong>Email:</strong> <span id="profileEmail"></span></p>
+      <p><strong>User ID:</strong> <span id="profileUID"></span></p>
+    </div>
+  </div>
+
+  <!-- DOWNLOAD PAGE -->
+  <div id="downloadsPage">
+    <h2>Your Downloads</h2>
+    <div id="downloadsList" class="card">Loading…</div>
+  </div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="modal-back" id="loginModal">
+  <div class="modal">
+    <h3>Login</h3>
+    <input id="loginEmail" placeholder="Email"><br><br>
+    <input id="loginPassword" placeholder="Password" type="password"><br><br>
+    <button class="btn" onclick="performLogin()">Login</button>
+    <button class="btn secondary" onclick="closeLogin()">Cancel</button>
+  </div>
+</div>
+
+<!-- REGISTER MODAL -->
+<div class="modal-back" id="registerModal">
+  <div class="modal">
+    <h3>Register</h3>
+    <input id="regName" placeholder="Full Name"><br><br>
+    <input id="regEmail" placeholder="Email"><br><br>
+    <input id="regPass" placeholder="Password" type="password"><br><br>
+    <button class="btn" onclick="performRegistration()">Register</button>
+    <button class="btn secondary" onclick="closeRegister()">Cancel</button>
+  </div>
+</div>
+
+<!-- NOTE MODAL -->
+<div class="modal-back" id="noteModal">
+  <div class="modal">
+    <h3>Add Note</h3>
+
+    <textarea 
+      id="noteInput"
+      placeholder="Write your note here..." 
+      style="width:100%;height:90px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:none;">
+    </textarea>
+    <br><br>
+
+    <button class="btn" onclick="saveNote()">Save Note</button>
+    <button class="btn secondary" onclick="closeNote()">Cancel</button>
+  </div>
+</div>
+
+<!-- EDIT NOTE MODAL -->
+<div class="modal-back" id="editNoteModal">
+  <div class="modal">
+    <h3>Edit Note</h3>
+
+    <textarea 
+      id="editNoteInput"
+      style="width:100%;height:90px;padding:10px;border-radius:8px;border:1px solid #ccc;resize:none;">
+    </textarea>
+    <br><br>
+
+    <button class="btn" onclick="saveEditedNote()">Save</button>
+    <button class="btn secondary" onclick="closeEditNote()">Cancel</button>
+  </div>
+</div>
+
+<script>
+/* -------------------------------------------------------------------
+   API BASE URL
+-------------------------------------------------------------------*/
+const API = "http://127.0.0.1:5001";
+
+/* -------------------------------------------------------------------
+   BASIC DOM REFERENCES
+-------------------------------------------------------------------*/
+const homePage = document.getElementById("homePage");
+const lectureGrid = document.getElementById("lectureGrid");
+const lockedMessage = document.getElementById("lockedMessage");
+const profilePage = document.getElementById("profilePage");
+const downloadsPage = document.getElementById("downloadsPage");
+const loginModal = document.getElementById("loginModal");
+const registerModal = document.getElementById("registerModal");
+
+const navHome = document.getElementById("navHome");
+const navUser = document.getElementById("navUser");
+const navRegister = document.getElementById("navRegister");
+const navDownloads = document.getElementById("navDownloads");
+
+const subjectSelect = document.getElementById("subjectSelect");
+const topicSelect = document.getElementById("topicSelect");
+const subtopicSelect = document.getElementById("subtopicSelect");
+const lectureList = document.getElementById("lectureList");
+
+let allVideos = [];
+let data = {};   // nested structure
+
+/* -------------------------------------------------------------------
+   FETCH VIDEO METADATA FROM BACKEND
+-------------------------------------------------------------------*/
+async function loadVideoData() {
+  try{
+    const res = await fetch(`${API}/videos`);
+    const json = await res.json();
+
+    if (!json.success) {
+      console.error("Video load failed");
+      return;
+    }
+
+    allVideos = json.videos;
+    buildDataStructure();
+    populateSubjects();
+  }catch(err){
+    console.error("Error fetching videos:", err);
+  }
+}
+
+function buildDataStructure(){
+  data = {};
+  allVideos.forEach(v=>{
+    if (!data[v.subject]) data[v.subject]={};
+    if (!data[v.subject][v.topic]) data[v.subject][v.topic]={};
+    if (!data[v.subject][v.topic][v.subtopic]) data[v.subject][v.topic][v.subtopic]=[];
+
+    data[v.subject][v.topic][v.subtopic].push({
+      id: v.id,
+      title: v.title,
+      src: v.url
+    });
+  });
+}
+
+/*--------------------------------------------------------------------
+   POPULATE SUBJECT → TOPIC → SUBTOPIC → LECTURES
+--------------------------------------------------------------------*/
+function populateSubjects(){
+  subjectSelect.innerHTML="";
+  Object.keys(data).forEach(s=>{
+    const opt=document.createElement("option");
+    opt.value=s; opt.textContent=s;
+    subjectSelect.appendChild(opt);
+  });
+  populateTopics();
+}
+function populateTopics(){
+  topicSelect.innerHTML="";
+  const s = subjectSelect.value;
+  Object.keys(data[s]||{}).forEach(t=>{
+    const opt=document.createElement("option");
+    opt.value=t; opt.textContent=t;
+    topicSelect.appendChild(opt);
+  });
+  populateSubtopics();
+}
+function populateSubtopics(){
+  subtopicSelect.innerHTML="";
+  const s=subjectSelect.value, t=topicSelect.value;
+  Object.keys((data[s]||{})[t]||{}).forEach(st=>{
+    const opt=document.createElement("option");
+    opt.value=st; opt.textContent=st;
+    subtopicSelect.appendChild(opt);
+  });
+  populateLectures();
+}
+function populateLectures(){
+  lectureList.innerHTML="";
+  const s=subjectSelect.value, t=topicSelect.value, st=subtopicSelect.value;
+  const arr = (((data[s]||{})[t]||{})[st]) || [];
+  if(arr.length===0){
+    lectureList.innerHTML="<div style='color:#777;'>No lectures</div>";
+    return;
+  }
+
+  arr.forEach(lec=>{
+    const div=document.createElement("div");
+    div.className="lecture-item";
+    div.innerHTML = `
+      <div>
+        <strong>${lec.title}</strong>
+        <div style="font-size:12px;color:#777;">${s} › ${t} › ${st}</div>
+      </div>
+
+      <div style="display:flex;gap:6px">
+        <button class="btn" data-open>Open</button>
+        <button class="btn secondary" data-download>⬇</button>
+      </div>
+    `;
+    lectureList.appendChild(div);
+
+    div.querySelector("[data-open]").onclick = ()=> loadLecture(lec);
+
+    div.querySelector("[data-download]").onclick = ()=>{
+      const uid = localStorage.getItem("uid");
+      const a = document.createElement("a");
+      a.href = lec.src;
+      a.download = lec.title + ".mp4";
+      a.click();
+
+      if(uid){
+        fetch(`${API}/download`,{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            uid, lectureId:lec.id, title:lec.title, src:lec.src
+          })
+        }).catch(()=>{});
+      }
+    };
+  });
+}
+
+subjectSelect.onchange = populateTopics;
+topicSelect.onchange = populateSubtopics;
+subtopicSelect.onchange = populateLectures;
+
+/* -------------------------------------------------------------------
+   VIDEO PLAYER + NOTES
+-------------------------------------------------------------------*/
+const video = document.getElementById("video");
+const playPauseBtn = document.getElementById("playPauseBtn");
+const speed = document.getElementById("speed");
+const progress = document.getElementById("progress");
+const markers = document.getElementById("markers");
+const notesContainer = document.getElementById("notesContainer");
+
+let currentLecture=null;
+let notes=[];
+
+function loadLecture(lec){
+  currentLecture=lec;
+  video.src=lec.src;
+  video.play();
+  document.getElementById("currentLectureTitle").textContent=lec.title;
+  notes = JSON.parse(localStorage.getItem("notes_"+lec.id) || "[]");
+  renderNotes();
+  renderMarkers();
+}
+
+video.onplay = ()=> playPauseBtn.textContent="Pause ❚❚";
+video.onpause = ()=> playPauseBtn.textContent="Play ▶";
+playPauseBtn.onclick = ()=> video.paused?video.play():video.pause();
+
+speed.onchange = ()=> video.playbackRate=parseFloat(speed.value)||1;
+
+video.ontimeupdate = ()=>{
+  const p = video.duration ? (video.currentTime/video.duration)*100 : 0;
+  progress.style.width = p+"%";
+  document.getElementById("timeDisplay").textContent =
+    `${fmt(video.currentTime)} / ${fmt(video.duration)}`;
+};
+
+function fmt(t){
+  if(!t || !isFinite(t)) return "0:00";
+  const m=Math.floor(t/60);
+  const s=Math.floor(t%60);
+  return `${m}:${String(s).padStart(2,"0")}`;
+}
+
+/* NOTES: ADD, EDIT, DELETE */
+document.getElementById("addNoteBtn").onclick = () => {
+  if (!currentLecture) return alert("Open a lecture first");
+  document.getElementById("noteInput").value = "";
+  document.getElementById("noteModal").style.display = "flex";
+};
+
+function closeNote(){
+  document.getElementById("noteModal").style.display = "none";
+}
+
+function saveNote(){
+  if (!currentLecture) { alert("Open a lecture first"); return; }
+
+  const text = document.getElementById("noteInput").value.trim();
+  if (!text) { alert("Note cannot be empty"); return; }
+
+  const time = video.currentTime || 0;
+  notes.push({ time, text });
+  notes.sort((a,b)=>a.time - b.time);
+  
+  localStorage.setItem("notes_" + currentLecture.id, JSON.stringify(notes));
+
+  renderNotes();
+  renderMarkers();
+
+  closeNote();
+}
+
+let editIndex = null;
+
+function openEditNote(i) {
+  editIndex = i;
+  document.getElementById("editNoteInput").value = notes[i].text;
+  document.getElementById("editNoteModal").style.display = "flex";
+}
+
+function closeEditNote() {
+  document.getElementById("editNoteModal").style.display = "none";
+}
+
+function saveEditedNote() {
+  const newText = document.getElementById("editNoteInput").value.trim();
+  if (!newText) {
+    alert("Note cannot be empty");
+    return;
+  }
+
+  notes[editIndex].text = newText;
+
+  localStorage.setItem("notes_" + currentLecture.id, JSON.stringify(notes));
+  renderNotes();
+  renderMarkers();
+
+  closeEditNote();
+}
+
+function deleteNote(i) {
+  if (!confirm("Delete this note?")) return;
+
+  notes.splice(i, 1);
+
+  localStorage.setItem("notes_" + currentLecture.id, JSON.stringify(notes));
+  renderNotes();
+  renderMarkers();
+}
+
+function renderNotes(){
+  notesContainer.innerHTML="";
+  if(notes.length===0){
+    notesContainer.innerHTML="<div style='color:#777;'>No notes yet.</div>";
+    return;
+  }
+  notes.forEach((n,i)=>{
+    const div=document.createElement("div");
+    div.className="note";
+    div.innerHTML = `
+      <div class="note-text">
+        <strong>${fmt(n.time)}</strong>
+        <div>${n.text}</div>
+      </div>
+      <div class="note-actions">
+        <button class="btn secondary note-edit">Edit</button>
+        <button class="btn secondary note-delete">Delete</button>
+        <button class="btn note-go">Go</button>
+      </div>
+    `;
+    notesContainer.appendChild(div);
+
+    div.querySelector(".note-edit").onclick = ()=> openEditNote(i);
+    div.querySelector(".note-delete").onclick = ()=> deleteNote(i);
+    div.querySelector(".note-go").onclick = ()=> jump(n.time);
+  });
+}
+
+function jump(t){
+  video.currentTime=t;
+  video.play();
+}
+
+function renderMarkers(){
+  markers.innerHTML="";
+  if(!video.duration) return;
+  notes.forEach(n=>{
+    const m=document.createElement("div");
+    m.className="marker";
+    m.style.left = (n.time/video.duration*100)+"%";
+    m.onclick=(e)=>{e.stopPropagation();jump(n.time);}
+    markers.appendChild(m);
+  });
+}
+
+/*-------------------------------------------------------------------
+   LOGIN / REGISTER
+-------------------------------------------------------------------*/
+function performLogin(){
+  const email = document.getElementById("loginEmail").value;
+  const password = document.getElementById("loginPassword").value;
+
+  fetch(`${API}/login`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({email,password})
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    if(!d.success){ alert("Invalid credentials"); return; }
+    localStorage.setItem("uid", d.uid);
+    localStorage.setItem("email", email);
+    updateUserUI();
+    closeLogin();
+    lockedMessage.style.display = "none";
+    lectureGrid.style.display = "grid";
+    loadVideoData();
+  });
+}
+
+function performRegistration(){
+  const name=document.getElementById("regName").value;
+  const email=document.getElementById("regEmail").value;
+  const password=document.getElementById("regPass").value;
+
+  fetch(`${API}/register`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({name,email,password})
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    if(!d.success){ alert("Registration failed"); return; }
+    alert("Registered successfully! Login now.");
+    closeRegister();
+  });
+}
+
+function closeLogin(){ loginModal.style.display="none"; }
+function closeRegister(){ registerModal.style.display="none"; }
+
+/* -------------------------------------------------------------------
+   NAVIGATION
+-------------------------------------------------------------------*/
+function hideAll(){
+  homePage.style.display="none";
+  profilePage.style.display="none";
+  downloadsPage.style.display="none";
+}
+
+navHome.onclick = ()=>{
+  hideAll();
+  homePage.style.display="block";
+};
+
+navRegister.onclick = ()=>{
+  registerModal.style.display="flex";
+};
+
+navUser.onclick = ()=>{
+  const uid = localStorage.getItem("uid");
+  if(!uid){ loginModal.style.display="flex"; return; }
+  hideAll();
+  document.getElementById("profileEmail").textContent = localStorage.getItem("email");
+  document.getElementById("profileUID").textContent = uid;
+  profilePage.style.display="block";
+};
+
+navDownloads.onclick = ()=>{
+  const uid = localStorage.getItem("uid");
+  if(!uid){ alert("Login first"); return; }
+  hideAll();
+  downloadsPage.style.display="block";
+  loadDownloads();
+};
+
+/* -------------------------------------------------------------------
+   DOWNLOAD HISTORY
+-------------------------------------------------------------------*/
+function loadDownloads(){
+  const uid = localStorage.getItem("uid");
+  fetch(`${API}/downloads?uid=${uid}`)
+    .then(r=>r.json())
+    .then(d=>{
+      const box=document.getElementById("downloadsList");
+      if(!d.success){ box.textContent="Error loading downloads."; return; }
+      if(d.downloads.length===0){
+        box.textContent="No downloads yet.";
+        return;
+      }
+      box.innerHTML="";
+      d.downloads.forEach(x=>{
+        box.innerHTML += `
+          <div style="padding:10px;border-bottom:1px solid #eee;">
+            <strong>${x.title}</strong><br>
+            <a href="${x.src}" download>Download again</a>
+          </div>
+        `;
+      });
+    });
+}
+
+/*-------------------------------------------------------------------
+   USER UI
+-------------------------------------------------------------------*/
+function updateUserUI(){
+  const email = localStorage.getItem("email");
+  const right = document.querySelector(".nav-right");
+  if(email){
+    right.innerHTML = `
+      <span>Logged in: ${email}</span>
+      <button class="btn secondary" onclick="logout()">Logout</button>
+    `;
+  }
+}
+function logout(){
+  localStorage.clear();
+  location.reload();
+}
+
+/*-------------------------------------------------------------------
+   INIT
+-------------------------------------------------------------------*/
+updateUserUI();
+
+const uidInit = localStorage.getItem("uid");
+if (!uidInit) {
+  // Not logged in: show locked message, hide lecture grid
+  lockedMessage.style.display = "block";
+  lectureGrid.style.display = "none";
+} else {
+  lockedMessage.style.display = "none";
+  lectureGrid.style.display = "grid";
+  loadVideoData();
+}
+
+/* expose functions used in inline onclick (safety) */
+window.performRegistration = performRegistration;
+window.performLogin = performLogin;
+window.closeLogin = closeLogin;
+window.closeRegister = closeRegister;
+window.saveNote = saveNote;
+window.closeNote = closeNote;
+window.openEditNote = openEditNote;
+window.closeEditNote = closeEditNote;
+window.saveEditedNote = saveEditedNote;
+window.deleteNote = deleteNote;
+window.jump = jump;
+
+</script>
+</body>
+</html>
